@@ -1,20 +1,26 @@
 {
   "name": "line-dist-renderer",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
+  "scripts": {
+    "render": "tsx render.ts",
+    "studio": "remotion studio src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "remotion": "^4.0.221",
     "@remotion/renderer": "^4.0.221",
-    "minimist": "^1.2.8",
-    "@remotion/bundler": "^4.0.221"
+    "@remotion/bundler": "^4.0.221",
+    "minimist": "^1.2.8"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "@types/react": "^18.3.17",
     "@types/react-dom": "^18.3.5",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }
 }

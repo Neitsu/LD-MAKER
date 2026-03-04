@@ -1,5 +1,5 @@
 import React, {useMemo} from 'react';
-import {AbsoluteFill, Audio, Img, Sequence, Video, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Audio, Img, Sequence, Video, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {BarsList} from './ui/BarsList';
 import {Gauge} from './ui/Gauge';
 import {fontStack} from './ui/typography';
@@ -27,32 +27,53 @@ const sampleStd = (values: number[]) => {
   return Math.sqrt(variance);
 };
 
+const toStatic = (p?: string) => (p ? staticFile(p.replace(/^\//, '')) : undefined);
+
 export const LineDistComposition: React.FC<Props> = (props) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
 
   const runtime = useMemo(() => {
+    const maxEnd = Math.max(...props.segments.map((s) => s.end), 1);
+    const frameCount = Math.ceil(maxEnd * fps);
     const byFrame: Record<string, number[]> = {};
-    const activeByFrame: string[] = [];
-    const frameCount = Math.ceil((Math.max(...props.segments.map((s) => s.end), 1)) * fps);
+    const activeByFrame: string[] = new Array(frameCount).fill('');
+
     props.members.forEach((m) => {
       byFrame[m.id] = new Array(frameCount).fill(0);
     });
 
+    const deltas: Record<string, number[]> = {};
+    props.members.forEach((m) => {
+      deltas[m.id] = new Array(frameCount + 1).fill(0);
+    });
+
+    props.segments.forEach((seg) => {
+      if (!deltas[seg.member]) return;
+      const startF = Math.max(0, Math.floor(seg.start * fps));
+      const endF = Math.min(frameCount, Math.ceil(seg.end * fps));
+      if (startF < endF) {
+        deltas[seg.member][startF] += 1;
+        deltas[seg.member][endF] -= 1;
+      }
+    });
+
+    const activeCounts: Record<string, number> = {};
+    props.members.forEach((m) => {
+      activeCounts[m.id] = 0;
+    });
+
     for (let f = 0; f < frameCount; f++) {
-      const t = f / fps;
+      let firstActive = '';
       for (const m of props.members) {
-        byFrame[m.id][f] = f === 0 ? 0 : byFrame[m.id][f - 1];
+        activeCounts[m.id] += deltas[m.id][f];
+        const prev = f > 0 ? byFrame[m.id][f - 1] : 0;
+        byFrame[m.id][f] = prev + (activeCounts[m.id] > 0 ? 1 / fps : 0);
+        if (!firstActive && activeCounts[m.id] > 0) {
+          firstActive = m.id;
+        }
       }
-      const active = props.segments.filter((s) => t >= s.start && t < s.end);
-      if (active.length > 0) {
-        activeByFrame[f] = active[0].member;
-      } else {
-        activeByFrame[f] = '';
-      }
-      for (const seg of active) {
-        if (byFrame[seg.member]) byFrame[seg.member][f] += 1 / fps;
-      }
+      activeByFrame[f] = firstActive;
     }
 
     const finalTotals: Record<string, number> = {};
@@ -71,7 +92,7 @@ export const LineDistComposition: React.FC<Props> = (props) => {
     return {byFrame, activeByFrame, finalTotals, dynamicSdv, frameCount};
   }, [props.members, props.segments, fps]);
 
-  const clampedFrame = Math.min(frame, runtime.frameCount - 1);
+  const clampedFrame = Math.max(0, Math.min(frame, runtime.frameCount - 1));
   const totalNow = props.members.reduce((acc, m) => acc + (runtime.byFrame[m.id][clampedFrame] ?? 0), 0);
   const finalMax = Math.max(...props.members.map((m) => runtime.finalTotals[m.id] ?? 0), 0.001);
   const dynamicMax = Math.max(...props.members.map((m) => runtime.byFrame[m.id][clampedFrame] ?? 0), 0.001);
@@ -79,28 +100,40 @@ export const LineDistComposition: React.FC<Props> = (props) => {
 
   const memberStates = props.members.map((m) => {
     const seconds = runtime.byFrame[m.id][clampedFrame] ?? 0;
-    const percent = totalNow > 0 ? (seconds / totalNow) * 100 : 0;
     return {
       ...m,
       seconds,
-      percent,
+      percent: totalNow > 0 ? (seconds / totalNow) * 100 : 0,
       active: runtime.activeByFrame[clampedFrame] === m.id,
       maxSeconds: denom,
+      avatar: toStatic(m.avatar) ?? '',
     };
   });
 
-  const sdv = props.showDynamicSdv ? runtime.dynamicSdv[clampedFrame] ?? 0 : runtime.dynamicSdv[runtime.frameCount - 1] ?? 0;
+  const sdv = props.showDynamicSdv
+    ? runtime.dynamicSdv[clampedFrame] ?? 0
+    : runtime.dynamicSdv[runtime.frameCount - 1] ?? 0;
 
   return (
     <AbsoluteFill style={{fontFamily: fontStack, backgroundColor: 'black'}}>
-      <Video src={props.backgroundVideo} style={{width: '100%', height: '100%', objectFit: 'cover', opacity: props.background?.opacity ?? 0.35, filter: `blur(${props.background?.blur ?? 2}px)`}} />
+      <Video
+        src={toStatic(props.backgroundVideo)}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          opacity: props.background?.opacity ?? 0.35,
+          filter: `blur(${props.background?.blur ?? 2}px)`,
+        }}
+      />
       <AbsoluteFill style={{backgroundColor: `rgba(0,0,0,${props.background?.darken ?? 0.35})`}} />
-      <Audio src={props.playbackAudio} />
+      <Audio src={toStatic(props.playbackAudio)} />
+
       <AbsoluteFill style={{padding: '80px 60px 120px 60px', display: 'flex'}}>
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
           <div>
             <div style={{fontSize: 56, color: 'white', fontWeight: 800}}>{props.songTitle}</div>
-            {props.songLogo ? <Img src={props.songLogo} style={{marginTop: 12, width: 190, objectFit: 'contain'}} /> : null}
+            {props.songLogo ? <Img src={toStatic(props.songLogo)!} style={{marginTop: 12, width: 190, objectFit: 'contain'}} /> : null}
           </div>
           <Gauge value={sdv} />
         </div>
@@ -108,8 +141,9 @@ export const LineDistComposition: React.FC<Props> = (props) => {
           <BarsList members={memberStates} />
         </div>
       </AbsoluteFill>
+
       <Sequence from={0}>
-        <AbsoluteFill style={{pointerEvents: 'none', opacity: interpolate(frame, [0, 15], [0, 1])}} />
+        <AbsoluteFill style={{pointerEvents: 'none', opacity: interpolate(frame, [0, 12], [0, 1])}} />
       </Sequence>
     </AbsoluteFill>
   );

@@ -11,9 +11,9 @@ Outil local (K-pop style) pour générer automatiquement une vidéo verticale **
   - suppression de segments courts
   - padding optionnel
 - Modes d’overlap:
-  - `lead`: gagnant RMS par frame (somme ≈ 100%)
-  - `overlap`: chaque membre cumule son temps
-  - `group`: overlap déplacé vers une piste `group`
+  - `lead`: gagnant RMS par frame (somme des % ≈ 100)
+  - `overlap`: chacun gagne du temps
+  - `group`: overlap déplacé vers piste `group` (`DUO/ALL` par défaut)
 - Exports:
   - `segments.json`
   - `summary.json` (totaux, %, SDV)
@@ -61,22 +61,30 @@ pip install -r analyzer/requirements.txt
 cd renderer && npm i && cd ..
 ```
 
+## Commande de rendu (recommandée)
+
+Depuis `line-dist-maker/`:
+
+```bash
+npm --prefix renderer run render -- --config examples/project.example.json --out out.mp4 --reanalyze
+```
+
 ## Format `project.json`
 
 Voir `examples/project.example.json`.
 
 Points clés:
+- Les chemins sont résolus relativement au dossier du fichier `project.json`.
 - Toutes les acapellas doivent être alignées temporellement (start à 00:00).
-- Le script aligne/tronque/pad automatiquement les fichiers à la durée max détectée.
+- Le script aligne/tronque/pad automatiquement les acapellas à la durée max détectée.
 
-## Commande de rendu
+## Pourquoi vous pouviez voir un écran 404
 
-```bash
-node renderer/render.ts --config examples/project.example.json --out out.mp4
-```
-
-Options:
-- `--reanalyze`: force régénération `segments.json` / `summary.json`.
+Le renderer attend des assets dans `renderer/public/runtime/<projectId>/`.
+Cette version:
+- copie automatiquement les assets dans ce dossier,
+- convertit les URLs assets avec `staticFile(...)` côté Remotion,
+- évite les chemins relatifs cassés.
 
 ## Analyse audio
 
@@ -92,25 +100,16 @@ Pipeline de `analyzer/analyze.py`:
 
 ### SDV
 
-Formule:
-
 ```txt
 SDV = (sample_std_dev(percents, ddof=1) / (100/N)) * 100
 ```
-
-## Notes performance
-
-- Le rendu pré-calcule les cumuls par frame.
-- Convient pour morceaux ~3-4 minutes.
 
 ## Dépannage
 
 - Si `ffmpeg` absent: installer via gestionnaire système.
 - Si VAD échoue: fallback RMS activé automatiquement.
-- Si Node ne lance pas `.ts` directement, exécuter:
+- Pour prévisualiser la composition:
 
 ```bash
-node --experimental-strip-types renderer/render.ts --config examples/project.example.json --out out.mp4
+npm --prefix renderer run studio
 ```
-
-(ou renommer en `.mjs` selon votre environnement)
