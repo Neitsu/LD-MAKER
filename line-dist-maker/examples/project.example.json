@@ -1,0 +1,28 @@
+{
+  "projectId": "my_project_001",
+  "songTitle": "GO",
+  "songLogo": "./assets/logo.png",
+  "backgroundVideo": "./assets/bg.mp4",
+  "background": {"opacity": 0.35, "blur": 2, "darken": 0.35},
+  "playbackAudio": "./assets/fullmix.mp3",
+  "members": [
+    {"id": "jisoo", "name": "Jisoo", "color": "#8e44ad", "avatar": "./assets/jisoo.png", "acapella": "./assets/jisoo.wav"},
+    {"id": "jennie", "name": "Jennie", "color": "#e84393", "avatar": "./assets/jennie.png", "acapella": "./assets/jennie.wav"}
+  ],
+  "analysis": {
+    "mode": "lead",
+    "vadAggressiveness": 2,
+    "minSegmentMs": 120,
+    "fillGapMs": 150,
+    "padMs": 50
+  },
+  "render": {
+    "fps": 30,
+    "width": 1080,
+    "height": 1920,
+    "font": "Inter",
+    "safeMargins": {"top": 80, "left": 60, "right": 60, "bottom": 120},
+    "barMaxMode": "dynamic",
+    "showDynamicSdv": true
+  }
+}
